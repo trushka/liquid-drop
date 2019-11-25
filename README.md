@@ -1,2 +1,2 @@
-# rotating Earth with animated meshwork around
+# liquid drop
 interactive animation on ThreeJs
