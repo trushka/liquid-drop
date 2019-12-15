@@ -48,22 +48,22 @@
 <body>
 
 	<div id="container"></div>
-	
+
 	<div id="info">
 		<a href="https://github.com/trushka/liquid-drop">github.com/trushka/liquid-drop</a>
 	</div>
 
-	<script src="three.min.js"></script>
+	<script src="three.js"></script>
 
 	<script src="TrackballControls.js"></script>
 
-	<script src="MarchingCubes.js"></script>
+	<script src="MetaBalls.js"></script>
 
 	<script>
 
 		var envSrc="windows.jpg";
 		var resolution = 30, isolation = 40, subtract = 3, strength=1.82,
-			speed = 3/5000, delta=.15, amplitude = .76, roV = .0003;
+			maxBlobs = 20, speed = 3/5000, delta=.15, amplitude = .76, roV = .0005;
 
 		var targGeometry=new THREE.TetrahedronGeometry();
 
@@ -75,7 +75,7 @@
 
 		var material, envMap;
 
-		var effect;
+		var effect, blobs = [new Float32Array(maxBlobs * 3), new Float32Array(maxBlobs)];
 
 		var time = 0;
 
@@ -88,7 +88,7 @@
 
 			// CAMERA
 
-			camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000 );
+			camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1000, 2000 );
 			camera.position.set( 0, 0, 1500 );
 
 			// SCENE
@@ -108,16 +108,13 @@
 
 			// MARCHING CUBES
 
-			effect = new THREE.MarchingCubes( resolution, material, true, true );
+			effect = new THREE.MetaBalls( envMap, camera, blobs, maxBlobs );
 			// effect.position.set( -450, -450, -450 );
 			effect.scale.multiplyScalar( 500 );
+
+			helper = new THREE.Points(targGeometry.clone());
+			scene.add(helper);
 			scene.add( effect );
-
-			effect.enableUvs = false;
-			effect.enableColors = false;
-			effect.init( Math.floor( resolution ) );
-			effect.isolation = isolation;
-
 
 			// RENDERER
 
@@ -158,24 +155,33 @@
 
 		// this controls content of marching cubes voxel field
 
-		function updateCubes( object, time ) {
+		function updateBlobs( object, time0 ) {
 
-			object.reset();
+			//object.reset();
 
-			var vertices = targGeometry.vertices, numblobs = vertices.length;
+			var vertices = targGeometry.vertices,
+				numBlobs = vertices.length,
+				time = time0;
 			//var strength = 1.2 / ( ( Math.sqrt( numblobs ) - 1 ) / 4 + 1 );
+			effect.setN(numBlobs);
 
-			for ( var i = 0; i < numblobs; i ++ ) {
+			for ( var i = 0; i < numBlobs; i ++ ) {
 
 				time+=delta;
+				let i3 = i * 3;
 
 				phase=Math.sin(time + .2 + .2*Math.sin(time*2))/2*amplitude;
+				let vertex = helper.geometry.vertices[i].copy(vertices[i])
+				 .multiplyScalar(phase)
+				 .applyMatrix4(effect.matrixWorld);
 
-				ballx = vertices[i].x * phase + .5;
-				bally = vertices[i].y * phase + .5;
-				ballz = vertices[i].z * phase + .5;
+				blobs[0][i3] = vertex.x;
+				blobs[0][i3+1] = vertex.y;
+				blobs[0][i3+2] = vertex.z;
 
-				object.addBall( ballx, bally, ballz, strength, subtract );
+				helper.geometry.verticesNeedUpdate=true;
+
+				//object.addBall( ballx, bally, ballz, strength, subtract );
 			}
 		}
 
@@ -201,7 +207,7 @@
 			// marching cubes
 
 			effect.rotateY(dt*roV);
-			updateCubes( effect, time );
+			updateBlobs( effect, time );
 
 			controls.update();
 
