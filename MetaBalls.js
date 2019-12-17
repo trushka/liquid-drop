@@ -68,7 +68,7 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs) {
 
 		vec3 raymarch(in vec3 pos, in vec3 dir, in float maxL) {
 			float l = 0.;
-			for (int i = 0; i < 128; ++i) {
+			for (int i = 0; i < 32; ++i) {
 				float d = world(pos + dir * l, maxL);
 				l += d; //d<0. ? d/=2. : d;
 				if ( abs(d)<.1 || i==steps) break;
