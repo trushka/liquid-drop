@@ -65,7 +65,7 @@
 		var resolution = 30, isolation = 40, subtract = 3, strength=1.82,
 			maxBlobs = 20, speed = 3/5000, delta=.15, amplitude = .76, roV = .0005;
 
-		var targGeometry=new THREE.TetrahedronGeometry();
+		var targGeometrys=[new THREE.TetrahedronGeometry(), new THREE.OctahedronGeometry(.6)] ;//
 
 		var t0 = Date.now(), dMax = 80, dMin = 1000/60, dT = 1000/50
 
@@ -75,7 +75,7 @@
 
 		var material, envMap;
 
-		var effect, blobs = [new Float32Array(maxBlobs * 3), new Float32Array(maxBlobs)];
+		var effect, blobs = [new Float32Array(maxBlobs * 3), new Float32Array(maxBlobs)], weights = [63,14,-120];
 
 		var time = 0;
 
@@ -112,8 +112,8 @@
 			// effect.position.set( -450, -450, -450 );
 			effect.scale.multiplyScalar( 500 );
 
-			helper = new THREE.Points(targGeometry.clone());
-			scene.add(helper);
+			//helper = new THREE.Points(targGeometry.clone());
+			//scene.add(helper);
 			scene.add( effect );
 
 			// RENDERER
@@ -158,31 +158,37 @@
 		function updateBlobs( object, time0 ) {
 
 			//object.reset();
+			var n=1;
+			targGeometrys.forEach(function(targGeometry, j){
+				var vertices = targGeometry.vertices,
+					numBlobs = vertices.length,
+					time = time0;
+				//var strength = 1.2 / ( ( Math.sqrt( numblobs ) - 1 ) / 4 + 1 );
 
-			var vertices = targGeometry.vertices,
-				numBlobs = vertices.length,
-				time = time0;
-			//var strength = 1.2 / ( ( Math.sqrt( numblobs ) - 1 ) / 4 + 1 );
-			effect.setN(numBlobs);
+				for ( var i = 0; i < numBlobs; i ++ ) {
 
-			for ( var i = 0; i < numBlobs; i ++ ) {
+					time+=delta;
+					let i3 = (i+n) * 3;
 
-				time+=delta;
-				let i3 = i * 3;
+					phase=Math.sin(time + .2 + .2*Math.sin(time*2))/2*amplitude;
+					let vertex = vertices[i].clone()//helper.geometry.vertices[i].copy()
+					 .multiplyScalar(phase)
+					 .applyMatrix4(effect.matrixWorld);
 
-				phase=Math.sin(time + .2 + .2*Math.sin(time*2))/2*amplitude;
-				let vertex = helper.geometry.vertices[i].copy(vertices[i])
-				 .multiplyScalar(phase)
-				 .applyMatrix4(effect.matrixWorld);
+					blobs[0][i3] = vertex.x;
+					blobs[0][i3+1] = vertex.y;
+					blobs[0][i3+2] = vertex.z;
 
-				blobs[0][i3] = vertex.x;
-				blobs[0][i3+1] = vertex.y;
-				blobs[0][i3+2] = vertex.z;
+					//helper.geometry.verticesNeedUpdate=true;
+					blobs[1][i+n]=weights[j];
 
-				helper.geometry.verticesNeedUpdate=true;
+					//object.addBall( ballx, bally, ballz, strength, subtract );
+				}
+				n+=numBlobs
 
-				//object.addBall( ballx, bally, ballz, strength, subtract );
-			}
+			})
+			blobs[1][0]=weights[weights.length-1];			
+			effect.setN(n);
 		}
 
 		//
