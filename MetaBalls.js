@@ -7,11 +7,11 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs) {
 		uniforms: {
 			envMap: {value: envMap},
 			blobs: {value: blobs[0]},
-			weights: {value: blobs[1]},
-			numBlobs: {type: '1i', value: maxBlobs},
+			numBlobs: {value: 6},
 			invMatrix: {value: new THREE.Matrix4()},
 			steps: {value: 100},
-			test: {value: 8800}
+			test: {value: 10},
+			k: {value: .03}
 		},
 		vertexShader: `
 		uniform mat4 invMatrix;
@@ -33,25 +33,26 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs) {
 
 		uniform sampler2D envMap;
 		uniform mat4 invMatrix;
-		uniform vec3 blobs[maxBlobs];
+		uniform vec3 blobs[maxBlobs*2];
 		uniform int numBlobs, steps;
-		uniform float test;
-		uniform float weights[maxBlobs];
+		uniform float test, k;
 		varying vec3 vNear, vFar; //
 		vec3 point;
 		bool breakAll;
 
+		float capsule(vec3 pos, vec3 a, vec3 b) {
+			vec3 pa = pos - a, ba = b - a;
+		    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+		    return length( pa - ba*h ) - test;   
+		}
+
 		float world(in vec3 at, in float maxL, in float maxL2) {
-			float sum = 0., invR = 0.;
+			float sum = 0.;
 			for (int i = 0; i < maxBlobs; ++i) {
 				if (i==numBlobs) break;
-				vec3 r = (blobs[i] - at);
-				float r2 = inversesqrt(dot(r, r));
-				invR += r2;
-				sum += weights[i]*r2;
-				//sum = min(sum, length(r) - test);
+				sum += exp(-k*capsule(at, blobs[2*i], blobs[2*i+1]));
 			}
-			return (1. - sum)/invR*float(numBlobs);
+			return -log(sum)/k;
 		}
 
 		vec3 normal(in vec3 pos, in float maxL2) {
@@ -70,10 +71,10 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs) {
 
 		vec3 raymarch(in vec3 pos, in vec3 dir, in float maxL, in float maxL2) {
 			float l = 0.;
-			for (int i = 0; i < 64; ++i) {
+			for (int i = 0; i < 32; ++i) {
 				float d = world(pos + dir * l, maxL, maxL2);
 				l += d; //d<0. ? d/=2. : d;
-				if ( abs(d)<.3 || i==steps) break;
+				if ( abs(d)<.5 || i==steps) break;
 				if (l > maxL) {l = 0.; break;}
 			}
 			return vec3(pos + dir * l);
@@ -116,7 +117,6 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs) {
 	};
 	metaBalls.onBeforeRender = function(){
 		material.uniforms.invMatrix.value.multiplyMatrices(camera.matrixWorld, camera.projectionMatrixInverse);
-		debugger;
 	};
 
 	return metaBalls
