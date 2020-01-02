@@ -162,6 +162,8 @@
 			renderer.setSize( window.innerWidth, window.innerHeight );
 			renderer.setPixelRatio( window.devicePixelRatio );
 
+			effect.resize(renderer.getDrawingBufferSize());
+
 		}
 
 		// this controls content of marching cubes voxel field

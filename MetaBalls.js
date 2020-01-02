@@ -51,9 +51,9 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 			blobs2: {value: blobs[2]},
 			numBlobs: {value: 6},
 			invMatrix: {value: new THREE.Matrix4()},
-			stepsFrag: {value: 32},
+			stepsFrag: {value: 64},
 			stepsVert: {value: 20},
-			test: {value: 10},
+			test: {value: 20},
 			k: {value: .022}
 		},
 		vertexShader: `
@@ -133,13 +133,16 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 			// gl_FragColor = vec4( 0, 1, 0, intensity );
 
 	});
-	var metaBalls = new THREE.Mesh(new THREE.PlaneGeometry(2,2, Math.round(rect.x/5), Math.round(rect.y/5)), material);
+	var metaBalls = new THREE.Mesh(new THREE.PlaneGeometry(2,2, Math.round(rect.x/10), Math.round(rect.y/10)), material);
 	metaBalls.setN = function(n) {
 		material.uniforms.numBlobs.value = n;
 	};
 	metaBalls.onBeforeRender = function(){
 		material.uniforms.invMatrix.value.multiplyMatrices(camera.matrixWorld, camera.projectionMatrixInverse);
 	};
+	metaBalls.resize=function(rect){
+		metaBalls.geometry = new THREE.PlaneBufferGeometry(2,2, Math.round(rect.x/10), Math.round(rect.y/10))
+	}
 
 	return metaBalls
 };
