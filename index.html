@@ -61,7 +61,7 @@
 
 	<script>
 
-		var envSrc="windows.jpg";
+		var envSrc="windows1.jpg";
 		var resolution = 30, isolation = 40, subtract = 3, strength=1.82,
 			maxBlobs = 20, speed = 3/5000, delta=.15, amplitude = .76, roV = .0005;
 
@@ -75,7 +75,8 @@
 
 		var material, envMap;
 
-		var effect, blobs = [new Float32Array(maxBlobs * 6), new Float32Array(maxBlobs)], weights = [63,14,-120];
+		var effect, blobs = [new Float32Array(maxBlobs * 6), new Float32Array(maxBlobs*3), new Float32Array(maxBlobs)],
+			weights = [63,14,-120];
 
 		var time = 0;
 
@@ -85,6 +86,19 @@
 		function init() {
 
 			container = document.getElementById( 'container' );
+
+			// RENDERER
+
+			renderer = new THREE.WebGLRenderer({alpha:true, antialias:true});
+			renderer.gammaOutput = true;
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+
+			renderer.domElement.style.position = "absolute";
+			renderer.domElement.style.top = "0px";
+			renderer.domElement.style.left = "0px";
+
+			container.appendChild( renderer.domElement );
 
 			// CAMERA
 
@@ -106,9 +120,7 @@
 			envMap.encoding=THREE.GammaEncoding;
 			material = new THREE.MeshPhongMaterial( { emissive: 0xffffff, envMap: envMap } );
 
-			// MARCHING CUBES
-
-			effect = new THREE.MetaBalls( envMap, camera, blobs, maxBlobs );
+			effect = new THREE.MetaBalls( envMap, camera, blobs, maxBlobs, renderer.getDrawingBufferSize() );
 			// effect.position.set( -450, -450, -450 );
 			effect.scale.multiplyScalar( 500 );
 
@@ -118,7 +130,6 @@
 
 			// RENDERER
 
-			renderer = new THREE.WebGLRenderer({alpha:true, antialias:true});
 			renderer.gammaOutput = true;
 			renderer.setPixelRatio( window.devicePixelRatio );
 			renderer.setSize( window.innerWidth, window.innerHeight );
@@ -188,7 +199,14 @@
 				}
 				var pos=new THREE.WireframeGeometry(geometry).attributes.position.array;
 				blobs[0].set(pos);
-				n+=pos.length / 6;
+				n0=pos.length / 6;
+				n+=n0;
+				for (var i = 0; i < n0; i++) {
+					let i6=i*6, i63=i6+3,
+						ab=new THREE.Vector3(pos[i6]-pos[i63], pos[i6+1]-pos[i63+1], pos[i6+2]-pos[i63+2])
+					ab.toArray(blobs[1], i*3);
+					blobs[2][i]=ab.lengthSq();
+				}
 
 			})
 			//blobs[1][0]=weights[weights.length-1]*weights[weights.length-1];			
