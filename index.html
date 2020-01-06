@@ -75,7 +75,7 @@
 
 		var material, envMap;
 
-		var effect, blobs = [new Float32Array(maxBlobs * 6), new Float32Array(maxBlobs*3), new Float32Array(maxBlobs)],
+		var effect, blobs = [new Float32Array(maxBlobs * 3), new Float32Array(maxBlobs*3), new Float32Array(maxBlobs)],
 			weights = [63,14,-120];
 
 		var time = 0;
@@ -200,12 +200,14 @@
 					//object.addBall( ballx, bally, ballz, strength, subtract );
 				}
 				var pos=new THREE.WireframeGeometry(geometry).attributes.position.array;
-				blobs[0].set(pos);
+				//blobs[0].set(pos);
 				n0=pos.length / 6;
 				n+=n0;
 				for (var i = 0; i < n0; i++) {
 					let i6=i*6, i63=i6+3,
-						ab=new THREE.Vector3(pos[i6]-pos[i63], pos[i6+1]-pos[i63+1], pos[i6+2]-pos[i63+2])
+						a=new THREE.Vector3(pos[i6], pos[i6+1], pos[i6+2]),
+						ab=new THREE.Vector3(pos[i6]-pos[i63], pos[i6+1]-pos[i63+1], pos[i6+2]-pos[i63+2]);
+					a.toArray(blobs[0], i*3);
 					ab.toArray(blobs[1], i*3);
 					blobs[2][i]=ab.lengthSq();
 				}

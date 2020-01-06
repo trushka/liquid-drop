@@ -2,7 +2,7 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 	var texture = new THREE.Texture();
 	var raymarch = `
 		uniform int numBlobs, steps;
-		uniform vec3 blobs[maxBlobs*2], blobs1[maxBlobs];
+		uniform vec3 blobs[maxBlobs], blobs1[maxBlobs];
 		uniform float blobs2[maxBlobs];
 		uniform float test, k;
 		varying vec3 vNear, vFar, vPoint;
@@ -18,7 +18,7 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 			float sum = 0.;
 			for (int i = 0; i < maxBlobs; ++i) {
 				if (i==numBlobs) break;
-				sum += exp(-k*capsule(-at+blobs[i*2], blobs1[i], blobs2[i]));
+				sum += exp(-k*capsule(-at+blobs[i], blobs1[i], blobs2[i]));
 			}
 			return -log(sum)/k;
 		}
