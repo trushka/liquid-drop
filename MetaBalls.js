@@ -5,7 +5,9 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 		uniform vec3 blobs[maxBlobs], blobs1[maxBlobs];
 		uniform float blobs2[maxBlobs];
 		uniform float test, k;
-		varying vec3 vNear, vFar, vPoint;
+		varying vec3 vNear, vFar;
+		varying vec4 vPoint;
+		varying float vMaxL;
 		vec3 point;
 		int n;
 
@@ -14,29 +16,35 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 		    return length( pa - ba*h );
 		}
 
-		float world(in vec3 at, in float maxL, in float maxL2) {
+		float world(in vec3 at, in float maxL) {
 			float sum = 0.;
 			for (int i = 0; i < maxBlobs; ++i) {
 				if (i==numBlobs) break;
-				sum += exp(-k*capsule(-at+blobs[i], blobs1[i], blobs2[i]));
+				sum += exp(-.022*capsule(-at+blobs[i], blobs1[i], blobs2[i]));
 			}
 			return -log(sum)/k;
 		}
 
-		vec3 raymarch(in vec3 pos, in vec3 dir, in float maxL, in float maxL2) {
-			float l = 0., d=maxL, d0;
+		vec4 raymarch(in vec3 pos, in vec3 dir, in float maxL) {
+			float l = 0., l0=0., d=maxL, d0;
 			for (int i = 0; i < 128; ++i) {
 				d0=d;
-				d = world(pos + dir * l, maxL, maxL2);
+				d = world(pos + dir * l, maxL);
+				#ifndef ISFRAG
+				 if (l0==0. && d>0. && d>d0) l0=l;
+				#endif
 				l += d;
 				if ( abs(d)<.5 || i==steps) break;
 				n=i;
-				if (l > maxL) {l = 0.; break;}
+				if (l > maxL) break;
 			}
 			#ifdef ISFRAG
-			 if (d>0. && d>d0) discard;
+			 l0=l;
+			 if (d>0. && d>d0) l=maxL;
+			#else
+
 			#endif
-			return vec3(pos + dir * l);
+			return vec4(pos + dir * l0, l);
 		}`;
 
 	var material = new THREE.ShaderMaterial({
@@ -44,6 +52,7 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 		defines: {
 			maxBlobs: maxBlobs
 		},
+		extensions: {derivatives: 1},
 		uniforms: {
 			envMap: {value: envMap},
 			blobs: {value: blobs[0]},
@@ -69,8 +78,8 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 			vFar = far.xyz / far.w;
 
 			vec3 dir0 = vFar - cameraPosition, dir = normalize(dir0), dist, point;
-			float maxL = length(dir0), maxL2=maxL*maxL, dist2; //test2 = test*test;
-			vPoint = raymarch(cameraPosition, dir, maxL, maxL2);
+			vMaxL = length(dir0); //, maxL2=maxL*maxL, dist2; //test2 = test*test;
+			vPoint = raymarch(cameraPosition, dir, vMaxL);
 		}`,
 		fragmentShader: `
 		#define PI 3.14159265359
@@ -86,6 +95,8 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 
 		` + raymarch.replace(/steps/g, 'stepsFrag') +`
 
+		float draw = 0.;
+
 		vec3 normal(in vec3 pos, in float maxL2) {
 			const float eps = 0.1;
 
@@ -94,25 +105,29 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 			const vec3 v3 = vec3(-eps, eps,-eps);
 			const vec3 v4 = vec3( eps, eps, eps);
 
-			return normalize( v1*world( pos + v1, 1., maxL2 ) + 
-							  v2*world( pos + v2, 1., maxL2 ) + 
-							  v3*world( pos + v3, 1., maxL2 ) + 
-							  v4*world( pos + v4, 1., maxL2 ) );
+			return normalize( v1*world( pos + v1, 1. ) + 
+							  v2*world( pos + v2, 1. ) + 
+							  v3*world( pos + v3, 1. ) + 
+							  v4*world( pos + v4, 1. ) );
 		}
 
 		void main() {
-			if (vPoint==cameraPosition) discard;
-			vec3 dir0 = vFar - vPoint, dir = normalize(dir0), dist, point;
+			if (vPoint.w >= vMaxL) discard;
+			vec3 dir0 = vFar - vPoint.xyz, dir = normalize(dir0), dist;
 			float intensity = 0., maxL = length(dir0), maxL2=maxL*maxL, dist2; //test2 = test*test;
-			point = raymarch(vPoint, dir, maxL, maxL2);
-			if (point==cameraPosition) discard;
+			vec4 point = raymarch(vPoint.xyz, dir, maxL);
+			if (point.w >= maxL) discard;
 
+			draw = 1.;
 			vec2 sampleUV;
-			vec3 reflectVec = reflect( dir, normal(point, maxL2) );
+			vec3 norm = normal(point.xyz, maxL2), reflectVec = reflect( dir, norm );
 			sampleUV.y = asin( clamp( reflectVec.y, - 1.0, 1.0 ) ) * RECIPROCAL_PI + 0.5;
 			sampleUV.x = asin( reflectVec.z / length(reflectVec.xz) ) * RECIPROCAL_PI2 + 0.5;
 			//float val=float(n)/float(stepsFrag);
 			gl_FragColor = texture2D( envMap, sampleUV ); //vec4(val,1.0-val,0,1);
+			float normDir = -dot(norm, dir);
+			//if (normDir<0.) discard;
+			gl_FragColor.a = smoothstep(0.05, 0.05+fwidth(normDir)*8., normDir);
 			//if (point!=vPoint) gl_FragColor.b=.5;
 
 		}`
