@@ -8,17 +8,16 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 		varying vec3 vNear, vFar;
 		varying vec4 vPoint;
 		varying float vMaxL;
-		vec3 point;
 		int n;
 
-		float capsule(vec3 pa, vec3 ba, float ba2) {
+		float capsule( vec3 pa, vec3 ba, float ba2) {
 		    float h = clamp( dot(pa,ba)/ba2, 0.0, 1.0 );
 		    return length( pa - ba*h );
 		}
 
-		float world(in vec3 at) {
+		float world(vec3 at) {
 			float sum = 0.;
-			for (int i = 0; i < maxBlobs; ++i) {
+			for (int i = 0; i < maxBlobs; i++) {
 				if (i==numBlobs) break;
 				sum += exp(-.022*capsule(-at+blobs[i], blobs1[i], blobs2[i]));
 			}
@@ -27,7 +26,7 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 
 		vec4 raymarch(in vec3 pos, in vec3 dir, in float maxL) {
 			float l = 0., l0=0., d=maxL, d0;
-			for (int i = 0; i < 128; ++i) {
+			for (int i = 0; i < 128; i++) {
 				d0=d;
 				d = world(pos + dir * l);
 				#ifndef ISFRAG
@@ -42,7 +41,7 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 			 l0=l;
 			 if (n==steps && d>0. && d>d0) l=maxL;
 			#else
-
+			 if (l < maxL)  l0=l;
 			#endif
 			return vec4(pos + dir * l0, l);
 		}`;
@@ -97,14 +96,14 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 
 		float draw = 0.;
 
-		vec3 normal(in vec3 pos) {
 			const float eps = 0.1;
 
 			const vec3 v1 = vec3( eps,-eps,-eps);
 			const vec3 v2 = vec3(-eps,-eps, eps);
 			const vec3 v3 = vec3(-eps, eps,-eps);
 			const vec3 v4 = vec3( eps, eps, eps);
-
+		vec3 normal(vec3 pos) {
+			//float wpos = world(v1);
 			return normalize( v1*world( pos + v1 ) + 
 							  v2*world( pos + v2 ) + 
 							  v3*world( pos + v3 ) + 
@@ -113,43 +112,29 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 
 		void main() {
 			if (vPoint.w >= vMaxL) discard;
-			vec3 dir = normalize(vFar - cameraPosition), dist;
-			float intensity = 0., maxL = length(vFar - vPoint.xyz); //, maxL2=maxL*maxL, dist2; //test2 = test*test;
+			vec3 dir = normalize(vFar - cameraPosition), dist, norm;
+			float intensity = 0., maxL = vPoint.w; //, maxL2=maxL*maxL, dist2; //test2 = test*test;
 			vec4 point = raymarch(vPoint.xyz, dir, maxL);
 			if (point.w >= maxL) discard;
+			else norm=normal(point.xyz);
 
-			draw = 1.;
-			vec2 sampleUV;
-			//vec3 norm=normal(point.xyz);
-			vec3 X = dFdx(point.xyz);
-			vec3 Y = dFdy(point.xyz);
-			vec3 norm=normalize(cross(X,Y));
+			//draw = 1.;
+			// vec3 X = dFdx(point.xyz);
+			// vec3 Y = dFdy(point.xyz);
+			// vec3 norm=normalize(cross(X,Y));
+			//gl_FragColor=vec4(1.);
+			float normDir = -dot(norm, dir);
+			if (normDir<=0.) discard;
 			vec3 reflectVec = reflect( dir, norm );
-			sampleUV.y = asin( clamp( reflectVec.y, - 1.0, 1.0 ) ) * RECIPROCAL_PI + 0.5;
-			sampleUV.x = asin( reflectVec.z / length(reflectVec.xz) ) * RECIPROCAL_PI2 + 0.5;
-			// float val=float(n)/float(stepsFrag);
-			gl_FragColor = texture2D( envMap, sampleUV );
-			//float normDir = -dot(norm, dir);
-			//if (normDir<0.) discard;
-			//gl_FragColor.a = 1.-smoothstep(0.05, 0.05+fwidth(normDir)*8., fwidth(point.w));
+			float UVy = asin( clamp( reflectVec.y, -1., 1. ) ) * RECIPROCAL_PI + 0.5;
+			float UVx = asin( reflectVec.z/length(reflectVec.xz) ) * RECIPROCAL_PI2 + 0.5;
+			//float val=float(n)/float(stepsFrag);
+			gl_FragColor = texture2D( envMap, vec2(UVx, UVy) );
+			
+			gl_FragColor.a = smoothstep(0.1, 0.3, normDir);
 			//if (point!=vPoint) gl_FragColor.b=.5;
 
 		}`
-			// //for (int i = 0; i < steps; i++) {
-			// 	float distInv = 0.;
-			// 	//point = mix(vNear, vFar, float(i)/float(steps) );
-			// 	for (int j = 0; j < maxBlobs; j++) {
-			// 		if (j == numBlobs) break;
-			// 		blob = blobs[j] - cameraPosition;
-			// 		dist = blob - dir * length(blob);
-			// 		dist2 = dot(dist, dist);
-			// 		distInv = max(test2 - dist2, 0.)/test2;
-			// 		intensity = max(intensity, distInv);
-			// 	}
-			// 	//if (i > 0 && dist0 < distInv) break;
-			// //}
-
-			// gl_FragColor = vec4( 0, 1, 0, intensity );
 
 	});
 	var metaBalls = new THREE.Mesh(new THREE.PlaneGeometry(2,2, Math.round(rect.x/10), Math.round(rect.y/10)), material);
