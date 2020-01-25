@@ -4,7 +4,7 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 		uniform int numBlobs, steps;
 		uniform vec3 blobs[maxBlobs], blobs1[maxBlobs];
 		uniform float blobs2[maxBlobs];
-		uniform float test, k;
+		uniform float test, k, minD;
 		varying vec3 vNear, vFar;
 		varying vec4 vPoint;
 		varying float vMaxL;
@@ -25,15 +25,19 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 		}
 
 		vec4 raymarch(in vec3 pos, in vec3 dir, in float maxL) {
-			float l = 0., l0=0., d=maxL, d0;
+			float l = 0., l0=0., d=maxL, dMin=maxL, d0, test2=minD/2.;
 			for (int i = 0; i < 128; i++) {
 				d0=d;
 				d = world(pos + dir * l);
+				if (d>0.) d=max(d, minD);
 				#ifndef ISFRAG
-				 if (l0==0. && d>0. && d>d0) l0=l;
+				 if (i>0 && d>0. && d>d0 && d<dMin) {
+				 	l0=l;
+				 	dMin=d;
+				 }
 				#endif
 				l += d;
-				if ( abs(d)<.1 || i==steps) break;
+				if ( abs(d)<test2 || i==steps) break;
 				n=i;
 				if (l > maxL) break;
 			}
@@ -62,12 +66,13 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 			stepsFrag: {value: 64},
 			stepsVert: {value: 20},
 			test: {value: 20},
-			k: {value: .022}
-		},
+			k: {value: .022},
+			minD: {value: .4}
+		}, //
 		vertexShader: `
 		uniform mat4 invMatrix;
 
-		` + raymarch.replace(/steps/g, 'stepsVert').replace('abs(d)<.1', '(d)<test') +`
+		` + raymarch.replace(/steps/g, 'stepsVert').replace('abs(d)<test2', '(d)<test') +`
 
 		void main() {
 			gl_Position = vec4( position.xy, -1., 1.0 );
@@ -124,14 +129,13 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 			// vec3 norm=normalize(cross(X,Y));
 			//gl_FragColor=vec4(1.);
 			float normDir = -dot(norm, dir);
-			if (normDir<=0.) discard;
-			vec3 reflectVec = reflect( dir, norm );
-			float UVy = asin( clamp( reflectVec.y, -1., 1. ) ) * RECIPROCAL_PI + 0.5;
-			float UVx = asin( reflectVec.z/length(reflectVec.xz) ) * RECIPROCAL_PI2 + 0.5;
+			if (normDir>0.) dir = reflect( dir, norm );
+			float UVy = asin( clamp( dir.y, -1., 1. ) ) * RECIPROCAL_PI + 0.5;
+			float UVx = asin( dir.z/length(dir.xz) ) * RECIPROCAL_PI2 + 0.5;
 			//float val=float(n)/float(stepsFrag);
 			gl_FragColor = texture2D( envMap, vec2(UVx, UVy) );
 			
-			gl_FragColor.a = smoothstep(0.1, 0.3, normDir);
+			//gl_FragColor.a = smoothstep(0., fwidth(vPoint.w), normDir);
 			//if (point!=vPoint) gl_FragColor.b=.5;
 
 		}`

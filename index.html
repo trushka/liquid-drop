@@ -10,18 +10,18 @@
 		  font-family: Monospace;
 		  font-size: 13px;
 		  text-align: center;
-
 		  background-color: #000;
 		  margin: 0px;
 		  overflow: hidden;
 		}
 
+		canvas {
+			transform: translate3D(0.5px, 0.5px, 1px);
+		}
+
 		#info {
 		  color: #ffffff;
-		  position: absolute;
-		  top: 0px;
-		  width: 100%;
-		  padding: 5px;
+		  margin: 5px;
 		}
 
 		a {
@@ -145,7 +145,10 @@
 			controls = new THREE.TrackballControls( camera, renderer.domElement );
 			Object.assign(controls, {
 				staticMoving: false,
-				rotateSpeed: 3
+				rotateSpeed: 3,
+				noPan: true,
+				minDistance: 500,
+				maxDistance: 1921
 			})
 
 			window.addEventListener( 'resize', onWindowResize, false );
@@ -185,7 +188,9 @@
 					time+=delta;
 					let i3 = (i+n) * 3;
 
-					phase = Math.sin(time)/2*amplitude; // + .2 + .2*Math.sin(time*2)
+					phase = Math.sin(time)/2*Math.min(amplitude, time0); // + .2 + .2*Math.sin(time*2)
+					phase*=Math.cos(time/2+.78);
+					
 					let vertex = vertices[i] //.clone() // helper.geometry.vertices[i].copy()
 					 .multiplyScalar(phase)
 					 .applyMatrix4(effect.matrixWorld);
