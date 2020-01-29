@@ -63,7 +63,7 @@
 
 		var envSrc="windows1.jpg";
 		var resolution = 30, isolation = 40, subtract = 3, strength=1.82,
-			maxBlobs = 20, speed = 3/5000, delta=.15, amplitude = .76, roV = .0005;
+			maxBlobs = 20, speed = 3/5000, delta=.15, amplitude = .76, roV = [.00046, -.00025];
 
 		var targGeometrys=[new THREE.TetrahedronGeometry() ];//, new THREE.OctahedronGeometry(.6)
 
@@ -243,7 +243,8 @@
 
 			// marching cubes
 
-			effect.rotateY(dt*roV);
+			scene.rotateY(dt*roV[0]);
+			effect.rotateX(dt*roV[1]);
 			updateBlobs( effect, time );
 
 			controls.update();

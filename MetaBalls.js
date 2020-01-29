@@ -4,7 +4,7 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 		uniform int numBlobs, steps;
 		uniform vec3 blobs[maxBlobs], blobs1[maxBlobs];
 		uniform float blobs2[maxBlobs];
-		uniform float test, k, minD;
+		uniform float test, k, minD, brightness;
 		varying vec3 vNear, vFar;
 		varying vec4 vPoint;
 		varying float vMaxL;
@@ -67,6 +67,7 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 			stepsVert: {value: 20},
 			test: {value: 20},
 			k: {value: .022},
+			brightness: {value: .1},
 			minD: {value: .4}
 		}, //
 		vertexShader: `
@@ -134,6 +135,8 @@ THREE.MetaBalls = function(envMap, camera, blobs, maxBlobs, rect) {
 			float UVx = asin( dir.z/length(dir.xz) ) * RECIPROCAL_PI2 + 0.5;
 			//float val=float(n)/float(stepsFrag);
 			gl_FragColor = texture2D( envMap, vec2(UVx, UVy) );
+			gl_FragColor.rgb+=brightness;
+			gl_FragColor.rgb/=1.+brightness;
 			
 			//gl_FragColor.a = smoothstep(0., fwidth(vPoint.w), normDir);
 			//if (point!=vPoint) gl_FragColor.b=.5;
