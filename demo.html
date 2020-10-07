@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Morphing drop</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<style>
+		html, body {
+		  color: #fff;
+		  font-family: Monospace;
+		  font-size: 13px;
+		  text-align: center;
+		  background-color: transparent;
+		  margin: 0px;
+		  overflow: hidden;
+		}
+
+		canvas {
+			transform: translate3D(0.5px, 0.5px, 1px);
+		}
+
+		#info {
+		  color: #ffffff;
+		  margin: 5px;
+		}
+
+		a {
+		  color: gold;
+		}
+
+		#webglmessage {
+		  font-family: monospace;
+		  font-size: 13px;
+
+		  text-align: center;
+		  background: rgb(0, 0, 50);
+		  color: #fff;
+		  padding: 1em;
+
+		  width: 475px;
+		  margin: 5em auto 0;
+
+		  display: none;
+		}
+	</style>
+</head>
+
+<body>
+
+	<div id="container"></div>
+
+	<script src="three.js"></script>
+
+	<script src="TrackballControls.js"></script>
+
+	<script src="MetaBalls.js"></script>
+
+	<script>
+
+		var envSrc="windows1.jpg";
+		var resolution = 30, isolation = 40, subtract = 3, strength=1.82,
+			maxBlobs = 20, speed = 3/5000, delta=.15, amplitude = 1.1, roV = [.00046, -.00025];
+
+		var targGeometrys=[new THREE.TetrahedronGeometry() ];//, new THREE.OctahedronGeometry(.6)
+
+		var t0 = Date.now(), dMax = 80, dMin = 1000/60, dT = 1000/50
+
+		var container;
+
+		var camera, controls, scene, renderer;
+
+		var material, envMap;
+
+		var effect, blobs = [new Float32Array(maxBlobs * 3), new Float32Array(maxBlobs*3), new Float32Array(maxBlobs)],
+			weights = [63,14,-120];
+
+		var time = 0;
+
+		init();
+		requestAnimationFrame( animate );
+
+		function init() {
+
+			container = document.getElementById( 'container' );
+
+			// RENDERER
+
+			renderer = new THREE.WebGLRenderer({alpha:true, antialias:true});
+			renderer.gammaOutput = true;
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+
+			renderer.domElement.style.position = "absolute";
+			renderer.domElement.style.top = "0px";
+			renderer.domElement.style.left = "0px";
+
+			container.appendChild( renderer.domElement );
+
+			// CAMERA
+
+			camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1000, 2000 );
+			camera.position.set( 0, 0, 1500 );
+
+			// SCENE
+
+			scene = new THREE.Scene();
+
+			// MATERIALS
+
+			THREE.ShaderChunk.envmap_fragment=THREE.ShaderChunk.envmap_fragment.replace(
+				'sampleUV.x = atan( reflectVec.z, reflectVec.x ) * RECIPROCAL_PI2 + 0.5;',
+				'sampleUV.x = asin( reflectVec.z / length(reflectVec.xz) ) * RECIPROCAL_PI2 + 0.5;'
+			);
+			envMap = new THREE.TextureLoader().load(envSrc);
+			envMap.mapping = THREE.EquirectangularReflectionMapping;
+			envMap.encoding=THREE.GammaEncoding;
+			material = new THREE.MeshPhongMaterial( { emissive: 0xffffff, envMap: envMap } );
+
+			effect = new THREE.MetaBalls( envMap, camera, blobs, maxBlobs, renderer.getDrawingBufferSize() );
+			// effect.position.set( -450, -450, -450 );
+			effect.scale.multiplyScalar( 500 );
+
+			helper = new THREE.WireframeGeometry(targGeometrys[0]);
+			//scene.add(helper);
+			scene.add( effect );
+
+			// RENDERER
+
+			renderer.gammaOutput = true;
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+
+			renderer.domElement.style.position = "absolute";
+			renderer.domElement.style.top = "0px";
+			renderer.domElement.style.left = "0px";
+
+			container.appendChild( renderer.domElement );
+
+			// CONTROLS
+
+			controls = new THREE.TrackballControls( camera, renderer.domElement );
+			Object.assign(controls, {
+				staticMoving: false,
+				rotateSpeed: 3,
+				noPan: true,
+				minDistance: 500,
+				maxDistance: 1921
+			})
+
+			window.addEventListener( 'resize', onWindowResize, false );
+
+		}
+
+		//
+
+		function onWindowResize() {
+
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			renderer.setPixelRatio( window.devicePixelRatio );
+
+			effect.resize(renderer.getDrawingBufferSize());
+
+		}
+
+		// this controls content of marching cubes voxel field
+
+		function updateBlobs( object, time0 ) {
+
+			//object.reset();
+			var n=0;
+			targGeometrys.forEach(function(targGeometry, j){
+				var geometry = targGeometry.clone(),
+					vertices = geometry.vertices,
+					numBlobs = vertices.length, //helper.attributes.position.count/2,
+					pos = helper.attributes.position.array,
+					time = time0;
+				//var strength = 1.2 / ( ( Math.sqrt( numblobs ) - 1 ) / 4 + 1 );
+
+				for ( var i = 0; i < numBlobs; i ++ ) {
+
+					time+=delta;
+					let i3 = (i+n) * 3;
+
+					phase = Math.sin(time)/2*Math.min(amplitude, time0); // + .2 + .2*Math.sin(time*2)
+					phase*=Math.cos(time/2+.78);
+					
+					let vertex = vertices[i] //.clone() // helper.geometry.vertices[i].copy()
+					 .multiplyScalar(phase)
+					 .applyMatrix4(effect.matrixWorld);
+
+					// blobs[0][i3] = vertex.x;
+					// blobs[0][i3+1] = vertex.y;
+					// blobs[0][i3+2] = vertex.z;
+
+					// //helper.geometry.verticesNeedUpdate=true;
+					// blobs[1][i+n]=weights[j]*weights[j];
+
+					//object.addBall( ballx, bally, ballz, strength, subtract );
+				}
+				var pos=new THREE.WireframeGeometry(geometry).attributes.position.array;
+				//blobs[0].set(pos);
+				n0=pos.length / 6;
+				n+=n0;
+				for (var i = 0; i < n0; i++) {
+					let i6=i*6, i63=i6+3,
+						a=new THREE.Vector3(pos[i6], pos[i6+1], pos[i6+2]),
+						ab=new THREE.Vector3(pos[i6]-pos[i63], pos[i6+1]-pos[i63+1], pos[i6+2]-pos[i63+2]);
+					a.toArray(blobs[0], i*3);
+					ab.toArray(blobs[1], i*3);
+					blobs[2][i]=ab.lengthSq();
+				}
+
+			})
+			//blobs[1][0]=weights[weights.length-1]*weights[weights.length-1];			
+			effect.setN(n);
+		}
+
+		//
+
+		function animate() {
+
+			requestAnimationFrame( animate );
+
+			render();
+
+		}
+
+		function render() {
+
+			var t = Date.now(), dt = t-t0;
+			if (dt<dMin) return; // !Eh || 
+			dt = Math.min(dt, dMax);
+			t0 = t;
+
+			time += dt * speed;
+
+			// marching cubes
+
+			scene.rotateY(dt*roV[0]);
+			effect.rotateX(dt*roV[1]);
+			updateBlobs( effect, time );
+
+			controls.update();
+
+			renderer.render( scene, camera );
+
+		}
+
+</script>
+
+</body>
+</html>
